@@ -1,0 +1,9 @@
+# Build output
+node_modules/
+dist/
+android/build/
+release/
+evidence/browser-artifacts/
+*.keystore
+*.jks
+local.properties
