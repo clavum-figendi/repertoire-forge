@@ -50,10 +50,19 @@ function parseGame(tokens, headers) {
   lines.unshift(path);
   return lines.filter(p => p.length).map((moves,index) => ({ root: positionKey(fen), fen, moves, white: headers.White || '', black: headers.Black || '', result: index===0 ? (headers.Result || tokens.findLast(t=>/^(1-0|0-1|1\/2-1\/2)$/.test(t)) || '*') : '*' }));
 }
-export function importPgn(text, existingGraph) {
+const archiveIds = new WeakMap();
+function canonicalGameId(site) {
+  const lichess=/^https:\/\/lichess\.org\/(?:game\/)?([a-zA-Z0-9]{8})(?:\/(?:white|black))?$/.exec(site||'');
+  if(lichess)return `https://lichess.org/${lichess[1]}`;
+  const chesscom=/^https:\/\/(?:www\.)?chess\.com\/game\/(live|daily)\/(\d+)$/.exec(site||'');
+  return chesscom ? `https://www.chess.com/game/${chesscom[1]}/${chesscom[2]}` : undefined;
+}
+export function importPgn(text, existingGraph, {deduplicate=false, maxStoredPlies=2048, mutate=false, strict=false} = {}) {
   if (typeof text !== 'string' || text.length > LIMITS.bytes) throw new Error('PGN input exceeds 20 MB limit');
-  const graph = existingGraph ? structuredClone(existingGraph) : emptyGraph();
+  const graph = existingGraph ? (mutate ? existingGraph : structuredClone(existingGraph)) : emptyGraph();
   graph.lines ||= [];
+  let ids;
+  if(deduplicate){ids=archiveIds.get(graph)||new Set(graph.lines.map(line=>line.gameId).filter(Boolean));archiveIds.set(graph,ids);}
   const tokens = text.replace(/^\uFEFF/, '').match(/\[(?:[^"\]]|"(?:\\.|[^"\\])*")*\]|\{[^}]*\}|;[^\n]*|\(|\)|[^\s(){};]+/g) || [];
   if (tokens.length > LIMITS.tokens) throw new Error('PGN token limit exceeded');
   let headers = {}, moves = [], gameNumber = 0, variationDepth = 0, importWork = 0;
@@ -61,7 +70,9 @@ export function importPgn(text, existingGraph) {
     if (!moves.length) return;
     gameNumber++;
     try {
-      const lines = parseGame(moves, headers);
+      const gameId = canonicalGameId(headers.Link)||canonicalGameId(headers.Site);
+      if(gameId && ids?.has(gameId)){moves=[];headers={};variationDepth=0;return;}
+      const lines = parseGame(moves, headers).map(line=>({...line,moves:line.moves.slice(0,maxStoredPlies)}));
       if (graph.lines.length + lines.length > LIMITS.lines) throw new Error('Line limit exceeded');
       const staged = emptyGraph(lines[0]?.fen);
       const seenEdges = new Set();
@@ -90,10 +101,11 @@ export function importPgn(text, existingGraph) {
           else target.edges.push(edge);
         }
       }
-      graph.lines.push(...lines.map(line=>({...line,game:graph.games})));
+      graph.lines.push(...lines.map(line=>({...line,game:graph.games,...(gameId?{gameId}:{})})));
+      if(gameId)ids?.add(gameId);
       if (!graph.games && lines.length) graph.root = lines[0].root;
       graph.games++;
-    } catch (error) { graph.warnings.push(`Game ${gameNumber}: ${error.message}`); }
+    } catch (error) { if(strict)throw error;graph.warnings.push(`Game ${gameNumber}: ${error.message}`); }
     moves = []; headers = {}; variationDepth = 0;
   }
   for (const token of tokens) {
@@ -214,6 +226,7 @@ export async function backsolve(input, { settings = {}, evaluate, theory, onProg
     abort(signal);
     const chess = new Chess(line.fen || input.nodes[line.root || input.root].fen);
     const resultLine = {...line, moves:[]}, seen = new Set();
+    delete resultLine.mistakePly;
     node(output, chess.fen());
     for (const uci of line.moves.slice(0,s.maxPly)) {
       abort(signal);

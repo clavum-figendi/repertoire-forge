@@ -14,10 +14,10 @@ Bundled engine: stockfish npm 17.1.0, single-thread lite NNUE build `stockfish-1
 
 ## Game import
 Lichess public username PGN export: https://lichess.org/api#tag/Games/operation/apiGamesUser .
-Chess.com read-only public archives: https://support.chess.com/en/articles/9650547-published-data-api . Sequential monthly requests, latest first, fixed game/byte bounds. Provider availability/CORS policies may change; PGN upload remains available. No password or token requested.
+Chess.com read-only public archives: https://support.chess.com/en/articles/9650547-published-data-api . Monthly archives are read sequentially, newest month first; games are streamed in bounded batches. All-history mode has no hidden matching-game cap. Each provider's live speed classification is preserved; Chess.com Daily is excluded. Provider availability/CORS policies may change; PGN upload remains available. No password or token requested.
 
 ## Maia
-https://github.com/CSSLab/maia-chess , GPLv3. Original Maia weights require lc0; authors recommend `go nodes 1` to predict human moves. Maia is not bundled and no invented Maia evaluations are displayed. Human move likelihood must never be presented as engine optimality. A usable cross-platform lc0/weights integration remains future work.
+[CSSLab Maia-2](https://github.com/CSSLab/maia2) rapid ONNX model, obtained from the [official frontend at the pinned revision](https://github.com/CSSLab/maia-platform-frontend/tree/e23a50e499b839ce85a79f9ca2cf99bb7211cc72). Model checksum, source and notices are in `public/models/maia2/`. Uses pinned IndieFoundry encoding/decoding and ONNX Runtime Web in a single-threaded browser worker. Human move likelihood is not engine optimality. The first ten plies were excluded in training; take early-opening predictions with caution.
 
 ## Libraries
 chess.js 1.4.0 BSD-2-Clause; sql.js 1.13.0 MIT (SQLite public domain); fflate 0.8.3 MIT. Their actual package license texts are copied into `licenses/` during packaging. Vite and Playwright are development tools only.

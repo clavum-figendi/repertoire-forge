@@ -96,29 +96,4 @@ export async function getTheory(fen, source = 'masters', signal) {
   };
   const result=theoryQueue.then(task);theoryQueue=result.catch(()=>{});return result;
 }
-export async function fetchGames(platform, username, {maxGames=200,signal} = {}) {
-  if(!['lichess','chesscom'].includes(platform))throw new Error('Unknown game platform');
-  if(typeof username!=='string'|| !/^[A-Za-z0-9_-]{2,30}$/.test(username))throw new Error('Enter a valid username (letters, numbers, underscore, dash).');
-  maxGames=Math.max(1,Math.min(10000,Math.round(Number(maxGames)||200)));
-  if(platform==='lichess'){
-    const url=new URL('https://lichess.org/api/games/user/'+encodeURIComponent(username));
-    for(const [k,v] of Object.entries({max:maxGames,pgnInJson:false,clocks:false,evals:false,opening:true,sort:'dateDesc'}))url.searchParams.set(k,String(v));
-    return request(url,{signal,accept:'application/x-chess-pgn'});
-  }
-  const endpoint='https://api.chess.com/pub/player/'+encodeURIComponent(username.toLowerCase());
-  const index=JSON.parse(await request(endpoint+'/games/archives',{signal}));
-  if(!Array.isArray(index.archives))throw new Error('No public game archives for this username');
-  const games=[];let bytes=0;
-  for(const url of [...index.archives].reverse()){
-    signal?.throwIfAborted();
-    const parsed=new URL(url);if(parsed.origin!=='https://api.chess.com'||!/^\/pub\/player\/[a-z0-9_-]+\/games\/\d{4}\/\d{2}$/.test(parsed.pathname))throw new Error('Invalid archive URL');
-    const month=JSON.parse(await request(url,{signal}));
-    for(const game of [...(month.games||[])].reverse()){
-      if(game.pgn && (game.rules===undefined||game.rules==='chess')) {bytes+=game.pgn.length;if(bytes>30*1024*1024)throw new Error('Import too large; lower the game limit.');games.push(game.pgn);}
-      if(games.length>=maxGames)break;
-    }
-    if(games.length>=maxGames)break;
-  }
-  if(!games.length)throw new Error('No standard public games found');
-  return games.join('\n\n');
-}
+export { fetchArchive as fetchGames } from './archive.js';

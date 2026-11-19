@@ -1,0 +1,12 @@
+{
+  "source": "https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e499b839ce85a79f9ca2cf99bb7211cc72/public/maia2/maia_rapid.onnx",
+  "sha256": "027ddb8c1a8b7235b6e51827cffe325f9cb95fd4523dce65a131547c034ccfc9",
+  "bytes": 93246338,
+  "model": "CSSLab Maia-2 rapid, original fp32 ONNX export",
+  "adapter": {
+    "package": "@indiefoundry/maia2-onnx",
+    "version": "0.1.0",
+    "upstreamCommit": "abe12b13a546d5cdad2ace53343adcf721537b08"
+  },
+  "licensing": "Maia-2 project is MIT (CSSLab, 2024). Original ONNX is distributed in CSSLab frontend under GPL-3.0. Both notices preserved; no independent license is embedded in the weight file."
+}

@@ -23,12 +23,13 @@ Dev server defaults to all interfaces for convenience; do not expose it to the p
 
 ## Workflow
 
-1. Paste/upload standard PGN, or import public Lichess/Chess.com games by username. Start with a modest recent sample; deep Stockfish analysis of a large archive can take hours on a phone.
+1. Paste/upload standard PGN, or expand **Import by username**. Choose all matching games or a recent sample, a strict minimum length, any supported live time controls, and optional dates (UTC). A White–Black pair counts as one move, and a final half-move counts as ½. On Chess.com, long live games usually count as Rapid rather than Classical; Daily games are excluded. The repertoire stores the first 80 plies (or your higher analysis limit) of each matching game, not its entire middlegame and endgame. Very large archives may exceed browser workspace limits; the app stops visibly without replacing your workspace. Start with a shorter date range for large accounts.
 2. Select reference theory and tune sample threshold, theory window, W/D/L expected-score drop, analysis depth and mistake threshold. **25 centipawns = 0.25 pawn.** Theory statistics and engine evaluation answer different questions; neither proves mathematical optimality.
 3. Backsolve, inspect progress, cancel if needed. API failure is shown rather than treated as an unknown opening. Card answers come from Stockfish, not a pretend fallback.
 4. Browse legal continuations on the board and add manual moves. Manual edits are not automatically engine-certified; rerun analysis as appropriate.
 5. Practice due positions: **play your answer on the board**; the app says whether it matches the repertoire move and shows the correct move if not (or reveal without guessing). Then grade Again / Hard / Good / Easy. The scheduler is SM-2-inspired, not Anki's FSRS. Anki export creates a fresh deck; it does not migrate the app's review history.
-6. Download PGN, CSV, Anki `.apkg`, or full JSON backup.
+6. In **Play**, choose a side and follow the repertoire against automatic replies. The session ends when the line runs out, either side plays a recorded refutation, or you leave the repertoire. Run Backsolve first to mark mistakes and their replies. Memorize automatically puts the side to move at the bottom of the board.
+7. Download PGN, CSV, Anki `.apkg`, or full JSON backup.
 
 ## Android
 
@@ -50,7 +51,7 @@ The build script uses standard javac/aapt/d8/zipalign/apksigner directly (no Gra
 - Finite-depth engine recommendations, not guaranteed optimal moves; retain a larger threshold or stronger theory filter for stylistic openings.
 - Canonical position identity uses the first four FEN fields: board, active side, castling and legal en passant. Move counters are not distinct opening cards. Repetition history is not represented by FEN alone.
 - PGN branch expansion/analysis are bounded; invalid games produce warnings. Standard chess only.
-- Maia is documented as an optional future integration, **not bundled**. It needs lc0 plus model weights, and human move probabilities are not optimality scores.
+- **Maia predictions** are available on the position toolbar. The optional first download is about 106 MB. Inference runs locally and predicts likely human moves at 1500 vs 1500; it doesn’t replace Stockfish analysis or the drill’s repertoire replies.
 - Public API rate limits, CORS restrictions or outages may block online imports/theory; file import works independently. No credentials requested.
 - Statistical theory sources, licenses and links are listed in SOURCES.md. No copyrighted textbook content is bundled.
 

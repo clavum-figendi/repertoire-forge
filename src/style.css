@@ -25,3 +25,8 @@ footer{padding-block:12px;font-size:12px;color:var(--muted)}
   dialog{width:min(94vw,540px);padding:16px}.export-list>div{grid-template-columns:36px minmax(0,1fr) auto}.export-list button{font-size:11px;padding-inline:7px}.export-list h3{font-size:13px}.export-list p{font-size:11px}
 }
 @media(max-width:350px){.board-toolbar{flex-wrap:wrap}.board-toolbar>span{margin-left:auto}.board-toolbar .text-button{margin-left:auto}}
+
+.training-toolbar>div,.training-toolbar>button{display:none}.training-toolbar{justify-content:center}.drill-moves{display:flex;flex-wrap:wrap;gap:7px 25px;padding-inline-start:24px;color:var(--muted)}
+.maia-results{list-style:none;padding:0;margin:8px 0 12px}.maia-results li{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}.insight-actions{flex-wrap:wrap}.insight-actions button{flex:1}
+#archive-form fieldset{min-width:0;margin:0;padding:0;border:0}.speed-picker{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px}.speed-picker legend{font-size:12px;font-weight:650;color:var(--muted)}.speed-picker label{min-height:44px;margin:0;display:flex;align-items:center;gap:8px}.speed-picker input{width:18px;min-height:18px;margin:0;accent-color:var(--sage);flex-shrink:0}#archive-form .form-row>*{min-width:0}#archive-form input[type="date"]{min-width:0}
+@media(max-width:760px){.workspaces{grid-template-columns:repeat(5,minmax(0,1fr))}}
