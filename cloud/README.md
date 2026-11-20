@@ -67,6 +67,17 @@ Multipart parts:
 
 The first-deploy metadata creates the SQLite class with `{migrations:{new_tag:"v1",steps:[{new_sqlite_classes:["BacksolveJob"]}]}}` and binds `JOBS` to class `BacksolveJob`. Compatibility date is 2026-07-30, matching the installed workerd tested runtime. No node compatibility flag is required. No `cpu_ms` paid-plan override is specified. On subsequent deployments to the existing class, omit migrations (or use an explicitly correct migration history), never create legacy KV classes.
 
+The connected OAuth sandbox cannot fetch binary artifacts from GitHub. From a trusted shell with an account-scoped **Workers Scripts Write** token in `CLOUDFLARE_API_TOKEN`, verify the dedicated account shows **Workers Free** in the dashboard, then run from `cloud/`:
+
+```sh
+npm ci
+npm run build
+npm test
+node publish.mjs --confirmed-workers-free
+```
+
+The publisher checks artifact hashes, verifies the dedicated account subdomain, uploads the real multipart body, and reads back the binding and `workers.dev` route. The flag records a manual plan check; it does not change the plan. The route is public; see the admission and quota caveat above. Verify live `/health` and a one-game job before putting the endpoint into the app.
+
 `deploy-multipart.mjs` exports `makeUpload(immutableRawBase,{existing})` as a tested pure FormData builder. It fetches the three files from `https://raw.githubusercontent.com/clavum-figendi/repertoire-forge/<FULL_COMMIT>/cloud/dist`; it does **not** send any mutation. The connected sandbox can run equivalent code, then use its authorized Cloudflare transport. Do not JSON-encode FormData or manually set a boundary. Enable the Worker workers.dev subdomain separately if needed and read back settings/deployment. Then verify `/health`, a capability-protected live one-game job, completion/result, and delete.
 
 Current authoritative docs were fetched directly, including Cloudflare's production docs source:
