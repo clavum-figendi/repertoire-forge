@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { createEngine } from './engine.js';
 import { importPgn, backsolve, positionKey, DEFAULT_SETTINGS } from '../../src/core.js';
 const MAX_BODY=256*1024, MAX_QUEUE=25, WRITE_BUDGET=20000;
-const ORIGINS=new Set(['https://clavum-figendi.github.io','http://localhost:5173','http://127.0.0.1:5173','http://localhost:4173','http://127.0.0.1:4173','http://localhost:4274','http://127.0.0.1:4274']);
+const ORIGINS=new Set(['https://clavum-figendi.github.io','https://appassets.androidplatform.net','http://localhost:5173','http://127.0.0.1:5173','http://localhost:4173','http://127.0.0.1:4173','http://localhost:4274','http://127.0.0.1:4274']);
 let engine, engineBusy=false;
 class HttpError extends Error {constructor(status,message){super(message);this.status=status;}}
 const fail=(status,message)=>{throw new HttpError(status,message);};

@@ -1,7 +1,7 @@
 {
   "worker.js": {
-    "bytes": 76080,
-    "sha256": "edec0bfa718ae9c2048d7f49c3fb71daa75ff75ff757dca56ffee64af9578d93"
+    "bytes": 76120,
+    "sha256": "5a97c92d64c702dc2a5f1e2f184279736a18e25abd451df3d85fea1bd2e6d59a"
   },
   "stockfish.wasm": {
     "bytes": 7280740,

@@ -22,11 +22,14 @@ test('capability job uploads PGN, resumes across restart, evaluates real engine 
   assert.equal((await call(url,'DELETE',null,job.capability)).status,200);assert.equal((await call(url,'GET',null,job.capability)).status,404);
  } finally {await mf.dispose();await rm(directory,{recursive:true,force:true});}
 });
-test('only published GitHub and local origins are allowed; malformed jobs rejected',async()=>{
+test('only published GitHub, bundled Android and local origins are allowed; malformed jobs rejected',async()=>{
  const mf=await runtime(false);try{
   assert.equal((await mf.dispatchFetch('http://localhost/health',{headers:{Origin:'https://evil.example'}})).status,403);
   const good=await mf.dispatchFetch('http://localhost/health',{headers:{Origin:'https://clavum-figendi.github.io'}});assert.equal(good.status,200);assert.equal(good.headers.get('Access-Control-Allow-Origin'),'https://clavum-figendi.github.io');
-  assert.equal((await mf.dispatchFetch('http://localhost/jobs',{method:'POST',body:JSON.stringify({platform:'chesscom'})})).status,400);
+  const android='https://appassets.androidplatform.net';
+ const preflight=await mf.dispatchFetch('http://localhost/jobs',{method:'OPTIONS',headers:{Origin:android,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'}});
+ assert.equal(preflight.status,204);assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),android);
+ assert.equal((await mf.dispatchFetch('http://localhost/jobs',{method:'POST',body:JSON.stringify({platform:'chesscom'})})).status,400);
  }finally {await mf.dispose();}
 });
 test('Lichess bounded cursor pages deduplicate boundary and merge results with real Stockfish',async()=>{

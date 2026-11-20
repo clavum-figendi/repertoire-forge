@@ -14,6 +14,7 @@ import java.util.*;
 /** Bundled HTTPS origin; network allowed only for public chess APIs. */
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
+    private static final String CLOUD_HOST = "repertoire-forge-cloud.clavum-figendi.workers.dev";
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
     private byte[] pendingExport;
@@ -26,12 +27,12 @@ public class MainActivity extends Activity {
         try {
             Map<String,String> headers = new HashMap<>();
             headers.put("Access-Control-Allow-Origin", "https://" + HOST);
-            headers.put("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' https://explorer.lichess.ovh https://lichess.org https://api.chess.com; object-src 'none'; base-uri 'self'");
+            headers.put("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' https://explorer.lichess.ovh https://lichess.org https://api.chess.com https://" + CLOUD_HOST + "; object-src 'none'; base-uri 'self'");
             return new WebResourceResponse(mime, "UTF-8", 200, "OK", headers, getAssets().open("web" + path));
         } catch (IOException e) { return denied(); }
     }
     private static WebResourceResponse denied() { return new WebResourceResponse("text/plain", "UTF-8", 403, "Forbidden", Collections.emptyMap(), new ByteArrayInputStream(new byte[0])); }
-    private boolean api(Uri uri) { return "https".equals(uri.getScheme()) && Arrays.asList("explorer.lichess.ovh", "lichess.org", "api.chess.com").contains(uri.getHost()); }
+    private boolean api(Uri uri) { return "https".equals(uri.getScheme()) && Arrays.asList("explorer.lichess.ovh", "lichess.org", "api.chess.com", CLOUD_HOST).contains(uri.getHost()); }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setStatusBarColor(0xffedf0e8);
