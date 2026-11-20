@@ -1,6 +1,6 @@
 const BASE = new URL('./', self.location.href);
 const PREFIX = `repertoire-forge:${BASE.pathname}:`;
-const CACHE = `${PREFIX}4`;
+const CACHE = `${PREFIX}5`;
 const localURL = path => new URL(path, BASE).href;
 self.addEventListener('install', event => {
   event.waitUntil((async () => {

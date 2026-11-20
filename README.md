@@ -23,6 +23,8 @@ Dev server defaults to all interfaces for convenience; do not expose it to the p
 
 ## Workflow
 
+For large archives, see [the three processing formats](PROCESSING.md): browser, a self-hosted Cloudflare Free serverless preparation backend, and a native command-line tool. Each prepares a JSON workspace that can be restored for web/Android training.
+
 1. Paste/upload standard PGN, or expand **Import by username**. Choose all matching games or a recent sample, a strict minimum length, any supported live time controls, and optional dates (UTC). A White–Black pair counts as one move, and a final half-move counts as ½. On Chess.com, long live games usually count as Rapid rather than Classical; Daily games are excluded. The repertoire stores the first 80 plies (or your higher analysis limit) of each matching game, not its entire middlegame and endgame. Very large archives may exceed browser workspace limits; the app stops visibly without replacing your workspace. Start with a shorter date range for large accounts.
 2. Select reference theory and tune sample threshold, theory window, W/D/L expected-score drop, analysis depth and mistake threshold. **25 centipawns = 0.25 pawn.** Theory statistics and engine evaluation answer different questions; neither proves mathematical optimality.
 3. Backsolve, inspect progress, cancel if needed. API failure is shown rather than treated as an unknown opening. Card answers come from Stockfish, not a pretend fallback.
@@ -51,7 +53,7 @@ The build script uses standard javac/aapt/d8/zipalign/apksigner directly (no Gra
 - Finite-depth engine recommendations, not guaranteed optimal moves; retain a larger threshold or stronger theory filter for stylistic openings.
 - Canonical position identity uses the first four FEN fields: board, active side, castling and legal en passant. Move counters are not distinct opening cards. Repetition history is not represented by FEN alone.
 - PGN branch expansion/analysis are bounded; invalid games produce warnings. Standard chess only.
-- **Maia predictions** are available on the position toolbar. The optional first download is about 106 MB. Inference runs locally and predicts likely human moves at 1500 vs 1500; it doesn’t replace Stockfish analysis or the drill’s repertoire replies.
+- **Maia predictions** are available on the position toolbar. The optional first download is about 106 MB. Settings → Maia Elo selects the supported 1000–2000+ buckets, defaulting to 2000+. This is not a dedicated grandmaster model and doesn’t replace Stockfish analysis or the drill’s repertoire replies.
 - Public API rate limits, CORS restrictions or outages may block online imports/theory; file import works independently. No credentials requested.
 - Statistical theory sources, licenses and links are listed in SOURCES.md. No copyrighted textbook content is bundled.
 

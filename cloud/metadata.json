@@ -1,0 +1,9 @@
+{
+  "main_module": "worker.js",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": [],
+  "usage_model": "standard",
+  "bindings": [{"type":"durable_object_namespace","name":"JOBS","class_name":"BacksolveJob"}],
+  "migrations": {"new_tag":"v1","steps":[{"new_sqlite_classes":["BacksolveJob"]}]},
+  "observability": {"enabled":true,"head_sampling_rate":0.1,"logs":{"enabled":true,"invocation_logs":true},"traces":{"enabled":true,"head_sampling_rate":0.1}}
+}

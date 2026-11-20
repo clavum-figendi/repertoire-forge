@@ -1,0 +1,21 @@
+[Event "Immediate refutation fixture"]
+[White "Tester"]
+[Black "Opponent"]
+[TimeControl "600+0"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Duplicate path unique cards"]
+[White "Tester"]
+[Black "Opponent"]
+[TimeControl "600+0"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Short filtered"]
+[TimeControl "60+0"]
+[Result "*"]
+
+1. e4 *

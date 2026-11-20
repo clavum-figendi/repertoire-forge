@@ -7,3 +7,10 @@ evidence/browser-artifacts/
 *.keystore
 *.jks
 local.properties
+native/target/
+native/artifacts/
+cloud/node_modules/
+cloud/dist/
+cloud/generated/
+cloud/.wrangler/
+.env*

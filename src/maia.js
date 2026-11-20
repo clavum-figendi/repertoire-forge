@@ -1,7 +1,7 @@
 import { Chess } from 'chess.js';
 
 // No model, runtime, worker, or network request is created until predictMaia.
-export const MAIA_RATING = 1500;
+export const MAIA_RATING = 2000;
 export const MAIA_MODEL_BYTES = 93246338;
 export const MAIA_RUNTIME_BYTES = 12361745;
 export const MAIA_MODEL_SHA256 = '027ddb8c1a8b7235b6e51827cffe325f9cb95fd4523dce65a131547c034ccfc9';
@@ -37,12 +37,14 @@ function getWorker() {
   return worker;
 }
 
-/** Legal move probabilities, not engine evaluations. Both players are rated 1500.
+/** Legal move probabilities, not engine evaluations. The supported Elo bucket
+ * is selected for both players; 2000+ is the highest, not a GM-only model.
  * Aborting drops the result; if no other callers remain, terminate the worker
  * (including any in-progress download or WASM inference). A later call retries.
  */
-export async function predictMaia(fen, { signal } = {}) {
+export async function predictMaia(fen, { signal, rating = MAIA_RATING } = {}) {
   if (signal?.aborted) throw abortError();
+  if(!Number.isInteger(rating)||rating<1000||rating>2000||rating%100)throw new Error('Maia rating must be 1000–2000 in steps of 100.');
   const board = new Chess(fen);
   if (!board.moves().length) return [];
   const activeWorker = getWorker();
@@ -68,6 +70,6 @@ export async function predictMaia(fen, { signal } = {}) {
       reject: (error) => { cleanup(); reject(error); },
     });
     signal?.addEventListener('abort', onAbort, { once: true });
-    activeWorker.postMessage({ id, fen: board.fen() });
+    activeWorker.postMessage({ id, fen: board.fen(), rating });
   });
 }

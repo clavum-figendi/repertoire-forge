@@ -1,0 +1,14 @@
+{
+  "worker.js": {
+    "bytes": 76080,
+    "sha256": "edec0bfa718ae9c2048d7f49c3fb71daa75ff75ff757dca56ffee64af9578d93"
+  },
+  "stockfish.wasm": {
+    "bytes": 7280740,
+    "sha256": "132ff831c2653a760e3693e9b1ad75506c6bb6df326e1404ab10ec531d4eb893"
+  },
+  "metadata.json": {
+    "bytes": 468,
+    "sha256": "f5949be413e85adb473022134a1a997e7f743c18fc158c4cd35f32774cbb492a"
+  }
+}

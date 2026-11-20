@@ -1,0 +1,7 @@
+node_modules/
+generated/
+.mf/
+.wrangler/
+# Deployment through the connected API fetches immutable committed modules.
+!dist/
+!dist/**

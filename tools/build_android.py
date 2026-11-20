@@ -10,7 +10,9 @@ jar=sdk/'platforms/android-35/android.jar'
 out=root/'android/build'
 out.mkdir(parents=True,exist_ok=True)
 assets=out/'assets/web'
-shutil.copytree(root/'dist',assets,dirs_exist_ok=True)
+if not (root/'dist/index.html').is_file(): raise SystemExit('Build the web app first (npm run build).')
+if assets.exists(): shutil.rmtree(assets)
+shutil.copytree(root/'dist',assets)
 classes=out/'classes'; classes.mkdir(exist_ok=True)
 def run(*args): subprocess.run([str(x) for x in args],check=True,cwd=root)
 run(java/'javac','-source','8','-target','8','-classpath',jar,'-d',classes,*sorted((root/'android/src').rglob('*.java')))

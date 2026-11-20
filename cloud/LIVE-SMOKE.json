@@ -1,0 +1,53 @@
+{
+  "source": "live public Lichess HTTP, real Stockfish inside SQLite DO/workerd",
+  "provider": "DrNykterstein",
+  "status": "done",
+  "games": 1,
+  "cards": 1,
+  "engineMemoryBytes": 67108864,
+  "evaluations": 3,
+  "stepWallMilliseconds": [
+    415,
+    20,
+    524,
+    98
+  ],
+  "analyses": [
+    {
+      "fen": "rnbqkb1r/pppppppp/5n2/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 1 2",
+      "source": "stockfish",
+      "bestMove": "c1f4",
+      "scoreCp": 18,
+      "depth": 8,
+      "nodes": 5001,
+      "nodeLimited": true,
+      "nodeBudget": 5000,
+      "requestedDepth": 14,
+      "scorePerspective": "side-to-move"
+    },
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+      "source": "stockfish",
+      "bestMove": "d7d5",
+      "scoreCp": -26,
+      "depth": 9,
+      "nodes": 5006,
+      "nodeLimited": true,
+      "nodeBudget": 5000,
+      "requestedDepth": 14,
+      "scorePerspective": "side-to-move"
+    },
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "source": "stockfish",
+      "bestMove": "e2e4",
+      "scoreCp": 41,
+      "depth": 7,
+      "nodes": 5003,
+      "nodeLimited": true,
+      "nodeBudget": 5000,
+      "requestedDepth": 14,
+      "scorePerspective": "side-to-move"
+    }
+  ]
+}

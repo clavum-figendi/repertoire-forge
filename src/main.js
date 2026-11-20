@@ -4,6 +4,8 @@ import { createEngine, getTheory, fetchGames } from './services.js';
 import { exportAnki, exportCsv, download } from './export.js';
 import {startDrill, advanceDrill, drillChoices, chooseDrillReply, boardFlipped} from './drill.js';
 import {predictMaia,MAIA_MODEL_BYTES,MAIA_RUNTIME_BYTES,MAIA_RATING} from './maia.js';
+import {appendArchiveBatch} from './archive-workspace.js';
+import {cloudBase,cloudRequest,DEFAULT_CLOUD_URL} from './cloud-client.js';
 import './style.css';
 
 const SAMPLE = '[Event "Sample · Italian opening"]\n[White "Sample White"]\n[Black "Sample Black"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 (3... Nf6 4. d3) 4. c3 Nf6 5. d3 d6 *';
@@ -12,7 +14,7 @@ const pieceNames = { k:'king', q:'queen', r:'rook', b:'bishop', n:'knight', p:'p
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 function blankGraph() { const fen = new Chess().fen(); const key = positionKey(fen); return { version:1, root:key, nodes:{[key]:{key,fen,visits:0,edges:[]}}, games:0, warnings:[] }; }
-const state = { maiaAllowed:false, archive:null, drill:null, drillSide:'w', sourceGraph:null, draft:'', graph:blankGraph(), cards:[], book:null, settings:{...DEFAULT_SETTINGS}, workspace:'Backsolve', path:[], flipped:false, selected:null, revealed:false, reviewId:null, busy:false, controller:null, engine:null, progress:'', notice:'', error:'', inspection:null, source:'masters' };
+const state = { cloudJob:null, maiaAllowed:false, archive:null, drill:null, drillSide:'w', sourceGraph:null, draft:'', graph:blankGraph(), cards:[], book:null, settings:{...DEFAULT_SETTINGS}, workspace:'Backsolve', path:[], flipped:false, selected:null, revealed:false, reviewId:null, busy:false, controller:null, engine:null, progress:'', notice:'', error:'', inspection:null, source:'masters' };
 let db;
 async function openStore() {
   return new Promise((resolve,reject) => { const req = indexedDB.open('repertoire-forge',1); req.onupgradeneeded = () => req.result.createObjectStore('state'); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
@@ -58,13 +60,13 @@ function renderInsight() {
   const key=positionKey(boardFen());const stored=state.graph.nodes[key];const data=state.inspection?.key===key?state.inspection:stored;
   if (!data?.analysis && !data?.theory && !data?.maia) return '';
   const a=data.analysis, t=data.theory;
-  const maia=data.maia?`<section><b>Maia-2 · ${MAIA_RATING} vs ${MAIA_RATING}</b><ol class="maia-results">${data.maia.slice(0,5).map(m=>`<li><b>${esc(uciSan(boardFen(),m.uci))}</b><span>${(100*m.probability).toFixed(1)}%</span></li>`).join('')}</ol>${data.maia.length?'':'<p>No legal moves.</p>'}</section>`:'';
+  const maia=data.maia?`<section><b>Maia-2 · ${esc(data.maiaRating||MAIA_RATING)} vs ${esc(data.maiaRating||MAIA_RATING)}</b><ol class="maia-results">${data.maia.slice(0,5).map(m=>`<li><b>${esc(uciSan(boardFen(),m.uci))}</b><span>${(100*m.probability).toFixed(1)}%</span></li>`).join('')}</ol>${data.maia.length?'':'<p>No legal moves.</p>'}</section>`:'';
   return `${a?`<div class="evaluation"><strong>${a.mate!==undefined?`M${esc(a.mate)}`:(a.scoreCp/100).toFixed(2)}</strong><div>Stockfish · depth ${esc(a.depth)}<small>Best move ${esc(uciSan(boardFen(),a.bestMove))} · side to move</small></div></div>`:''}${t? t.userBook?`<p><b>User-supplied book</b> · ${esc(t.total)} observations</p><p class="fine-print">Move frequencies only. Only recorded game results, never occurrence counts, inform WDL theory skipping.</p>${t.moves.length?t.moves.map(m=>`<div class="theory-row"><b>${esc(m.san)}</b><span>${esc(m.count)} observations · ${Math.round(m.count/t.total*100)}%</span></div>`).join(''):'<p>No matching moves in your user-supplied book.</p>'}`:`<p><b>${esc(t.source||state.source)} opening database</b> · ${esc((t.white||0)+(t.draws||0)+(t.black||0))} games</p>${(t.moves||[]).slice(0,8).map(m=>`<div class="theory-row"><b>${esc(m.san||m.uci)}</b><span>${esc(m.white)} W / ${esc(m.draws)} D / ${esc(m.black)} L</span></div>`).join('')||'<p>No matching games: out of theory in this source.</p>'}`:''}${maia}`;
 }
 const timeControls = [['bullet','Bullet'],['blitz','Blitz'],['rapid','Rapid'],['classical','Standard / classical']];
 function archiveMarkup() {
   const a=state.archive||{platform:'lichess',username:state.settings.username,history:'all',minMoves:0,timeControls:timeControls.map(([key])=>key),from:'',to:''};
-  return `<details class="import-online" ${state.archive?'open':''}><summary>Import by username</summary><form id="archive-form"><fieldset ${state.busy?'disabled':''}><div class="form-row"><label>Platform<select name="platform"><option value="lichess">Lichess</option><option value="chesscom" ${a.platform==='chesscom'?'selected':''}>Chess.com</option></select></label><label>Game history<select name="history">${[['all','All matching games'],['100','Latest 100 matches'],['500','Latest 500 matches']].map(([key,label])=>`<option value="${key}" ${a.history===key?'selected':''}>${label}</option>`).join('')}</select></label></div><label>Player username<input name="username" value="${esc(a.username)}" required autocomplete="off" maxlength="30"></label><label>More than this many moves<input name="minMoves" type="number" min="0" max="1024" step="1" value="${esc(a.minMoves)}" required></label><fieldset class="speed-picker"><legend>Time controls</legend>${timeControls.map(([key,label])=>`<label><input type="checkbox" name="speed" value="${key}" ${a.timeControls.includes(key)?'checked':''}>${label}</label>`).join('')}</fieldset><div class="form-row"><label>From date (optional)<input name="from" type="date" value="${esc(a.from)}"></label><label>To date (optional)<input name="to" type="date" value="${esc(a.to)}"></label></div><button type="submit">Fetch &amp; import games</button></fieldset></form></details>`;
+  return `<details class="import-online" ${state.archive?'open':''}><summary>Import by username</summary><form id="archive-form"><fieldset ${state.busy?'disabled':''}><div class="form-row"><label>Platform<select name="platform"><option value="lichess">Lichess</option><option value="chesscom" ${a.platform==='chesscom'?'selected':''}>Chess.com</option></select></label><label>Game history<select name="history">${[['all','All matching games'],['100','Latest 100 matches'],['500','Latest 500 matches']].map(([key,label])=>`<option value="${key}" ${a.history===key?'selected':''}>${label}</option>`).join('')}</select></label></div><label>Player username<input name="username" value="${esc(a.username)}" required autocomplete="off" maxlength="30"></label><label>Processing<select name="processing"><option value="browser">On this device</option><option value="cloud">Cloudflare Free backend</option></select></label><label>More than this many moves<input name="minMoves" type="number" min="0" max="1024" step="1" value="${esc(a.minMoves)}" required></label><fieldset class="speed-picker"><legend>Time controls</legend>${timeControls.map(([key,label])=>`<label><input type="checkbox" name="speed" value="${key}" ${a.timeControls.includes(key)?'checked':''}>${label}</label>`).join('')}</fieldset><div class="form-row"><label>From date (optional)<input name="from" type="date" value="${esc(a.from)}"></label><label>To date (optional)<input name="to" type="date" value="${esc(a.to)}"></label></div><button type="submit">Fetch &amp; import games</button></fieldset></form>${state.cloudJob?'<button data-action="resume-cloud">Resume cloud job</button><button data-action="delete-cloud">Delete cloud job</button>':''}<p class="fine-print">Cloud mode fetches and backsolves remotely in resumable batches. Free quotas still apply.</p></details>`;
 }
 function renderBacksolve() {
   return `<div class="section-heading"><h2>Games</h2></div><label class="sr-only" for="pgn">PGN notation</label><textarea id="pgn" placeholder="Paste PGN here" ${state.busy?'disabled':''}>${esc(state.draft)}</textarea><div class="import-actions"><button class="primary" data-action="import" ${state.busy?'disabled':''}>Import PGN</button><label class="button" for="pgn-file">Upload file<input id="pgn-file" type="file" accept=".pgn,.txt" class="sr-only" ${state.busy?'disabled':''}></label>${!state.graph.games?`<button class="text-button" data-action="sample" ${state.busy?'disabled':''}>Load sample</button>`:''}</div>${archiveMarkup()}<div class="divider"></div><div class="section-heading"><h2>Analysis</h2></div><div class="run-row"><button class="primary" data-action="backsolve" ${state.busy||!state.graph.games?'disabled':''}>${state.busy?'Working…':'Backsolve repertoire'} <span aria-hidden="true">→</span></button></div><div id="progress" class="progress-status">${esc(state.progress||(!state.graph.games?'Import games to begin.':''))}</div>${state.cards.length?'<button class="text-button" data-workspace="Memorize">Practice cards →</button>':''}`;
@@ -101,7 +103,7 @@ function renderMemorize() {
 function renderExport() { return `<div class="section-heading"><h2>Downloads</h2></div><div class="export-list"><div><span class="file-icon">PGN</span><div><h3>Repertoire notation</h3><p>Legal lines and variations, ready for a chess study.</p></div><button data-action="export-pgn">Download PGN</button></div><div><span class="file-icon">ANKI</span><div><h3>Spaced-repetition deck</h3><p>${state.cards.length} positions with answers. Import into Anki.</p></div><button data-action="export-anki" ${!state.cards.length?'disabled':''}>Download Anki</button></div><div><span class="file-icon">CSV</span><div><h3>Training data</h3><p>Card positions, moves and analysis sources.</p></div><button data-action="export-csv" ${!state.cards.length?'disabled':''}>Download CSV</button></div><div><span class="file-icon">JSON</span><div><h3>Full workspace backup</h3><p>Graph, book, settings and your review history.</p></div><button data-action="backup">Download JSON backup</button></div></div><div class="restore-box"><h3>Restore a workspace</h3><p class="muted">Replace this device’s repertoire with a saved JSON backup. You’ll be asked to confirm.</p><label class="button" for="restore-file">Choose backup<input id="restore-file" type="file" accept=".json" hidden ${state.busy?'disabled':''}></label></div>`; }
 function settingsMarkup() {
   const fields=[['mistakeCp','Mistake threshold (centipawns)',1,500,1],['depth','Stockfish depth (ply)',4,20,1],['maxPly','Maximum analysis ply',2,160,1],['theoryPlies','Theory look-up ply',0,40,1],['minTheoryGames','Minimum theory games',1,1000000,1],['maxTheoryDrop','Maximum expected-score drop',0,0.5,0.01]];
-  return `<form id="settings-form"><div class="eyebrow">TUNE YOUR WORKSPACE</div><h2>Settings</h2><label for="theory-source">Opening reference</label><select id="theory-source" ${state.busy?'disabled':''}><option value="masters" ${state.source==='masters'?'selected':''}>Lichess Masters · WDL statistics</option><option value="lichess" ${state.source==='lichess'?'selected':''}>Lichess players · WDL statistics</option><option value="book" ${state.source==='book'?'selected':''}>User-supplied PGN · recorded results</option><option value="none" ${state.source==='none'?'selected':''}>No theory skip · engine only</option></select><div class="book-import"><label class="text-button" for="book-file">+ Import your own book PGN<input type="file" id="book-file" accept=".pgn,.txt" class="sr-only" ${state.busy?'disabled':''}></label><span class="fine-print">${state.book?`${state.book.games} book games saved`:'No user book loaded'}</span></div><details class="advanced-settings" open><summary>Analysis & practice</summary><div class="settings-grid">${fields.map(([k,label,min,max,step])=>`<label>${label}<input name="${k}" type="number" min="${min}" max="${max}" step="${step}" value="${esc(state.settings[k])}" required></label>`).join('')}</div><label>Train side<select name="trainSide">${['both','white','black'].map(s=>`<option ${state.settings.trainSide===s?'selected':''}>${s}</option>`).join('')}</select></label><label>Training username<input name="username" maxlength="40" value="${esc(state.settings.username)}" placeholder="Optional · only train this player’s side"></label></details><div class="dialog-actions"><button type="button" data-action="close-dialog">Cancel</button><button class="primary" type="submit" ${state.busy?'disabled':''}>Save settings</button></div></form>`;
+  return `<form id="settings-form"><div class="eyebrow">TUNE YOUR WORKSPACE</div><h2>Settings</h2><label for="theory-source">Opening reference</label><select id="theory-source" ${state.busy?'disabled':''}><option value="masters" ${state.source==='masters'?'selected':''}>Lichess Masters · WDL statistics</option><option value="lichess" ${state.source==='lichess'?'selected':''}>Lichess players · WDL statistics</option><option value="book" ${state.source==='book'?'selected':''}>User-supplied PGN · recorded results</option><option value="none" ${state.source==='none'?'selected':''}>No theory skip · engine only</option></select><div class="book-import"><label class="text-button" for="book-file">+ Import your own book PGN<input type="file" id="book-file" accept=".pgn,.txt" class="sr-only" ${state.busy?'disabled':''}></label><span class="fine-print">${state.book?`${state.book.games} book games saved`:'No user book loaded'}</span></div><label>Cloud backend URL<input name="cloudUrl" type="url" value="${esc(state.settings.cloudUrl||DEFAULT_CLOUD_URL)}"></label><label>Maia Elo<select name="maiaRating">${Array.from({length:11},(_,i)=>1000+i*100).map(elo=>`<option value="${elo}" ${elo===(state.settings.maiaRating||MAIA_RATING)?'selected':''}>${elo===1000?'Below 1100':elo===2000?'2000+ (strongest supported)':elo}</option>`).join('')}</select></label><p class="fine-print">Maia’s top bucket is 2000+, not a dedicated grandmaster model.</p><details class="advanced-settings" open><summary>Analysis & practice</summary><div class="settings-grid">${fields.map(([k,label,min,max,step])=>`<label>${label}<input name="${k}" type="number" min="${min}" max="${max}" step="${step}" value="${esc(state.settings[k])}" required></label>`).join('')}</div><label>Train side<select name="trainSide">${['both','white','black'].map(s=>`<option ${state.settings.trainSide===s?'selected':''}>${s}</option>`).join('')}</select></label><label>Training username<input name="username" maxlength="40" value="${esc(state.settings.username)}" placeholder="Optional · only train this player’s side"></label></details><div class="dialog-actions"><button type="button" data-action="close-dialog">Cancel</button><button class="primary" type="submit" ${state.busy?'disabled':''}>Save settings</button></div></form>`;
 }
 function renderBoard() {
   const chess=new Chess(boardFen()); const flipped=boardFlipped(state.workspace,review()?chess.turn():null,state.flipped,state.drill?.side||state.drillSide); const ranks=flipped?[1,2,3,4,5,6,7,8]:[8,7,6,5,4,3,2,1]; const files=flipped?'hgfedcba':'abcdefgh';
@@ -171,10 +173,11 @@ async function inspectMaia() {
   const fen=boardFen(),key=positionKey(fen);
   await task(async signal=>{
     notify('Loading Maia and predicting moves…');
-    const maia=await predictMaia(fen,{signal});
+    const rating=state.settings.maiaRating||MAIA_RATING;
+    const maia=await predictMaia(fen,{signal,rating});
     signal.throwIfAborted();
     const previous=state.inspection?.key===key?state.inspection:state.graph.nodes[key];
-    state.inspection={key,theory:previous?.theory,analysis:previous?.analysis,maia};
+    state.inspection={key,theory:previous?.theory,analysis:previous?.analysis,maia,maiaRating:rating};
     notify('');
   });
 }
@@ -191,16 +194,18 @@ async function importRemote() {
   const since=dates[0]?Date.parse(dates[0]+'T00:00:00Z'):undefined;
   const until=dates[1]?Date.parse(dates[1]+'T23:59:59.999Z'):undefined;
   if(!username||!timeControls.length||since>until) return notify('Enter a username, choose a time control and check the date range.',true);
+  if(data.get('processing')==='cloud'){if(platform==='chesscom')return notify('Cloud mode currently fetches Lichess directly. For Chess.com use the native CLI or upload a PGN through the cloud tools.',true);await runCloudArchive({platform,username,minMoves,timeControls,since,until,maxGames:Number.isFinite(maxGames)?maxGames:null});return;}
   state.archive={platform,username,history:data.get('history'),minMoves,timeControls,from:dates[0],to:dates[1]};
   await task(async signal=>{
     const before=state.sourceGraph||state.graph;
-    let graph=structuredClone(before);
+    let graph=structuredClone(before), capacityStop=false;
     try {
       const result=await fetchGames(platform,username,{maxGames,minMoves,timeControls,since,until,signal,
         onProgress:p=>updateProgress(`Scanned ${p.scanned} · ${p.matched} matching`),
         onBatch:async text=>{
           signal.throwIfAborted();
-          graph=importPgn(text,graph,{deduplicate:true,maxStoredPlies:Math.max(80,state.settings.maxPly),mutate:true,strict:true});
+          const result=appendArchiveBatch(graph,text,{maxStoredPlies:Math.max(80,state.settings.maxPly)});
+          if(result.stopped){capacityStop=true;throw new Error(result.reason);}
           await new Promise(resolve=>setTimeout(resolve,0));
         }});
       signal.throwIfAborted();
@@ -208,8 +213,43 @@ async function importRemote() {
       if(added){await persist({graph,sourceGraph:graph});state.sourceGraph=graph;state.graph=graph;state.path=[];state.inspection=null;state.drill=null;}
       state.progress=`${result.scanned} scanned · ${result.matched} matched`;
       notify(added ? `Imported ${added} new ${added===1?'game':'games'}.` : 'No new matching games.');
-    }catch(error){if(/limit exceeded/i.test(error.message))throw new Error('The archive exceeds workspace limits. Try a narrower date range or a fresh workspace. Your saved games were not changed.');throw error;}
+    }catch(error){
+      if(capacityStop){
+        const added=graph.games-before.games;
+        if(added){await persist({graph,sourceGraph:graph});state.sourceGraph=graph;state.graph=graph;state.path=[];state.inspection=null;}
+        state.progress='Archive capacity reached. Saved games are ready to backsolve.';
+        notify(`Archive capacity reached. Kept ${added} new games; backsolve the saved games or continue with cloud/native processing.`);
+        return;
+      }
+      throw error;
+    }
   });
+}
+async function runCloudArchive(filters) {
+  await task(async signal=>{
+    if(state.cloudJob)throw new Error('Resume or delete the previous cloud job first.');
+    const base=cloudBase(state.settings.cloudUrl||DEFAULT_CLOUD_URL);
+    const created=await cloudRequest(base,'/jobs',{method:'POST',body:{...filters,settings:{mistakeCp:state.settings.mistakeCp,trainSide:state.settings.trainSide,depth:Math.min(14,state.settings.depth),maxPly:Math.min(64,state.settings.maxPly)}},signal});
+    state.cloudJob={base,id:created.id,token:created.token};
+    sessionStorage.setItem('repertoire-cloud-job',JSON.stringify(state.cloudJob));
+    await continueCloudJob(signal);
+  });
+}
+async function continueCloudJob(signal) {
+  const job=state.cloudJob;if(!job)throw new Error('No cloud job to resume.');
+  let status;
+  do {
+    signal.throwIfAborted();
+    status=await cloudRequest(job.base,`/jobs/${job.id}/step`,{method:'POST',token:job.token,signal});
+    updateProgress('Cloud · '+progressText(status));
+    if(status.status==='error'){notify(status.error||'Cloud processing stopped; partial results are available.',true);break;}
+    if(!['done','complete','completed'].includes(status.status))await new Promise(resolve=>setTimeout(resolve,500));
+  }while(!['done','complete','completed'].includes(status.status));
+  const result=await cloudRequest(job.base,`/jobs/${job.id}/result`,{token:job.token,signal});
+  validateGraph(result.graph);
+  download('cloud-repertoire.json',JSON.stringify(result),'application/json');
+  state.progress='Restore the downloaded JSON under Export to begin training.';
+  notify(status.status==='error'?`Partial cloud repertoire downloaded. ${status.error||'Processing stopped early.'}`:'Cloud repertoire downloaded. Your current workspace has not been replaced.',status.status==='error');
 }
 function validateGraph(g) {
   if(!g||g.version!==1||!g.nodes||!g.nodes[g.root]||!Number.isInteger(g.games)||g.games<0)throw new Error('Invalid repertoire graph.');
@@ -223,10 +263,10 @@ function validateGraph(g) {
 }
 async function restore(file) {
   if(state.busy)return;
-  try { if(file.size>25*1024*1024)throw new Error('Backup limit is 25 MB.');const data=JSON.parse(await file.text());if(data.format!=='repertoire-forge'||data.version!==1)throw new Error('Not a supported Repertoire Forge backup.');validateGraph(data.graph);if(data.sourceGraph)validateGraph(data.sourceGraph);if(data.book)validateGraph(data.book);if(!Array.isArray(data.cards)||data.cards.length>100000)throw new Error('Invalid cards.');for(const c of data.cards){new Chess(c.fen);if(c.id!==positionKey(c.fen))throw new Error('Invalid card position identity.');if(!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(c.uci)||!Number.isFinite(c.due)||!Number.isFinite(c.interval)||!Number.isFinite(c.ease)||!Number.isFinite(c.repetitions)||!Number.isFinite(c.lapses))throw new Error('Invalid review card.');const chess=new Chess(c.fen);chess.move({from:c.uci.slice(0,2),to:c.uci.slice(2,4),promotion:c.uci[4]});}const settings=boundedSettings(data.settings||DEFAULT_SETTINGS);if(!confirm('Replace your repertoire, book and review progress with this backup?'))return;Object.assign(state,{graph:data.graph,sourceGraph:data.sourceGraph||data.graph,cards:data.cards,book:data.book||null,settings,path:[],inspection:null,selected:null});await save();render();notify('Backup restored and saved locally.'); }catch(e){notify(`Restore failed: ${e.message}`,true);}
+  try { if(file.size>25*1024*1024)throw new Error('Backup limit is 25 MB.');const data=JSON.parse(await file.text());if(data.format!=='repertoire-forge'||data.version!==1)throw new Error('Not a supported Repertoire Forge backup.');validateGraph(data.graph);if(data.sourceGraph)validateGraph(data.sourceGraph);if(data.book)validateGraph(data.book);if(!Array.isArray(data.cards)||data.cards.length>100000)throw new Error('Invalid cards.');for(const c of data.cards){new Chess(c.fen);if(c.id!==positionKey(c.fen))throw new Error('Invalid card position identity.');if(!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(c.uci)||!Number.isFinite(c.due)||!Number.isFinite(c.interval)||!Number.isFinite(c.ease)||!Number.isFinite(c.repetitions)||!Number.isFinite(c.lapses))throw new Error('Invalid review card.');const chess=new Chess(c.fen);chess.move({from:c.uci.slice(0,2),to:c.uci.slice(2,4),promotion:c.uci[4]});}const settings=boundedSettings({...data.settings||DEFAULT_SETTINGS,cloudUrl:state.settings.cloudUrl});if(!confirm('Replace your repertoire, book and review progress with this backup?'))return;Object.assign(state,{graph:data.graph,sourceGraph:data.sourceGraph||data.graph,cards:data.cards,book:data.book||null,settings,path:[],inspection:null,selected:null});await save();render();notify('Backup restored and saved locally.'); }catch(e){notify(`Restore failed: ${e.message}`,true);}
 }
 function boundedSettings(s) {
-  const out={...DEFAULT_SETTINGS};const bounds={mistakeCp:[1,500],depth:[4,20],maxPly:[2,160],theoryPlies:[0,40],minTheoryGames:[1,1000000],maxTheoryDrop:[0,0.5]};
+  const out={...DEFAULT_SETTINGS,cloudUrl:s.cloudUrl?.trim()?cloudBase(s.cloudUrl.trim()):DEFAULT_CLOUD_URL,maiaRating:Number(s.maiaRating||MAIA_RATING)};if(!Number.isInteger(out.maiaRating)||out.maiaRating<1000||out.maiaRating>2000||out.maiaRating%100)throw new Error('Invalid Maia Elo');const bounds={mistakeCp:[1,500],depth:[4,20],maxPly:[2,160],theoryPlies:[0,40],minTheoryGames:[1,1000000],maxTheoryDrop:[0,0.5]};
   for(const[k,[min,max]]of Object.entries(bounds)){const v=Number(s[k]);if(!Number.isFinite(v)||v<min||v>max||(k!=='maxTheoryDrop'&&!Number.isInteger(v)))throw new Error(`Invalid setting: ${k}. Expected ${min}–${max}.`);out[k]=v;}
   if(!['both','white','black'].includes(s.trainSide))throw new Error('Invalid training side.');out.trainSide=s.trainSide;out.username=String(s.username||'').trim().slice(0,40);return out;
 }
@@ -247,6 +287,8 @@ function bind() {
 async function runAction(action) {
   const actions={
     'start-drill':()=>{if(state.busy)return;state.drill=startDrill(state.graph,$('#drill-side').value,$('#drill-root')?.value||state.graph.root);state.selected=null;state.notice='';replyToDrill();render();},
+    'resume-cloud':()=>task(signal=>continueCloudJob(signal)),
+    'delete-cloud':async()=>{if(state.cloudJob){const j=state.cloudJob;await cloudRequest(j.base,`/jobs/${j.id}`,{method:'DELETE',token:j.token});state.cloudJob=null;sessionStorage.removeItem('repertoire-cloud-job');render();}},
     maia:()=>state.maiaAllowed?inspectMaia():$('#maia-dialog').showModal(),
     'load-maia':()=>{state.maiaAllowed=true;return inspectMaia();},
     settings:()=>$('#settings-dialog').showModal(),sources:()=>$('#sources-dialog').showModal(),'close-dialog':()=>document.querySelectorAll('dialog[open]').forEach(d=>d.close()),
@@ -263,6 +305,7 @@ async function runAction(action) {
 document.addEventListener('keydown',e=>{if(['Memorize','Play'].includes(state.workspace)||['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||document.querySelector('dialog[open]'))return;if(e.key==='ArrowLeft'){e.preventDefault();runAction('back');}if(e.key==='ArrowRight'){e.preventDefault();runAction('next');}});
 async function init() {
   let storageError;
+  try{const j=JSON.parse(sessionStorage.getItem('repertoire-cloud-job'));if(j&&typeof j.id==='string'&&typeof j.token==='string')state.cloudJob=j;}catch{}
   try { db=await openStore();const data=await new Promise((resolve,reject)=>{const req=db.transaction('state').objectStore('state').get('workspace');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});if(data){validateGraph(data.graph);if(data.sourceGraph)validateGraph(data.sourceGraph);if(data.book)validateGraph(data.book);state.draft=data.draft||'';state.graph=data.graph;state.sourceGraph=data.sourceGraph||data.graph;state.cards=data.cards||[];state.book=data.book||null;state.settings=boundedSettings({...DEFAULT_SETTINGS,...data.settings});state.source=['masters','lichess','book','none'].includes(data.source)?data.source:'masters';} }catch(e){storageError=`Local storage unavailable: ${e.message}. Export backups before closing.`;}
   if(storageError)state.storageError=storageError;render();
   if('serviceWorker'in navigator && import.meta.env.PROD){try{const registration=await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;const offlineAssets=['engine/stockfish-17.1-lite-single-03e3232.js','engine/stockfish-17.1-lite-single-03e3232.wasm','vendor/sql-wasm.wasm'].map(path=>new URL(path,location.href).href);const assets=[...offlineAssets,...[...document.querySelectorAll('script[src],link[rel="stylesheet"],link[rel="modulepreload"]')].map(el=>el.src||el.href)];const worker=registration.active||registration.waiting||registration.installing;worker?.postMessage({type:'CACHE_ASSETS',urls:assets});}catch(e){notify(`Offline cache unavailable: ${e.message}. App remains usable online.`,true);}}

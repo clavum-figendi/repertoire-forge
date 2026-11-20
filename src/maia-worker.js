@@ -33,12 +33,13 @@ async function loadModel() {
 
 // Serialize inference; avoid overlapping session.run and extra memory spikes.
 let queue = Promise.resolve();
-self.onmessage = ({ data: { id, fen } }) => {
+self.onmessage = ({ data: { id, fen, rating = 2000 } }) => {
   queue = queue.then(async () => {
     try {
       if (!modelPromise) modelPromise = loadModel().catch((error) => { modelPromise = undefined; throw error; });
       const model = await modelPromise;
-      const prediction = await model.predict(fen, 1500, 1500);
+      if(!Number.isInteger(rating)||rating<1000||rating>2000||rating%100)throw new Error('Unsupported Maia rating');
+      const prediction = await model.predict(fen, rating, rating);
       const moves = prediction.moves.map(({ uci, p }) => ({ uci, probability: p }));
       if (moves.some(({ probability }) => !Number.isFinite(probability) || probability < 0 || probability > 1)) {
         throw new Error('Maia returned invalid probabilities');
